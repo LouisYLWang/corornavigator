@@ -139,11 +139,33 @@ def load_us_state_vaccination(state):
             conn.commit()
     print("Load us state vaccination finished!")
 
+def load_world_vaccination(country):
+    data = pd.read_csv("https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/vaccinations/vaccinations.csv")
+    data = data[data["location"].isin(country["Name"])]
+    state_name = pd.Index(state["Name"])
+    data["state_id"] = data["location"].map(lambda x: state_name.get_loc(x) + 1)
+    today_data = data
+    #next line is used for daily update
+    #today_data = data[data["date"] == datetime.datetime.now().strftime('%Y-%m-%d')]
+    today_data = today_data.where(today_data.notnull(), None)
+    if len(today_data) > 1:
+        today_data = today_data[["state_id", "people_fully_vaccinated", "people_vaccinated_per_hundred", "date"]]
+        us_vac_list = today_data.values.tolist()
+        try:
+            conn = pymysql.connect(host=RDS_HOST, user=DB_USERNAME, passwd=PASSWORD, database=DB_NAME)
+        except:
+            print("ERROR: Unexpected error: Could not connect to MySQL instance.")
+            
+        with conn.cursor() as cur:
+            cur.executemany("INSERT INTO vaccine_us (us_state_id, number_people_vaccinated, percentage_people_vaccinated, date) values (%s, %s, %s, %s)", us_vac_list)
+            conn.commit()
+    print("Load us state vaccination finished!")
+
     # data = pd.read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/%i-%i-2021.csv".format([current_time.month, current_time.day]))
     # "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/{0}-{1}-2021.csv".format(current_time.month, current_time.day)
 if __name__ == "__main__": 
     country = transform_country()
     state = transform_state()
-    airport = transform_airport()
+    airport = transform_airport(country, state)
     load_airport(country, state)
     load_flight(airport)
