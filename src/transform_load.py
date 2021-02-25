@@ -120,49 +120,39 @@ def load_opensky_flight(airport):
         conn.commit()
     print("Load interational flight finished!")
 
-def load_us_state_vaccination(state):
-    data = pd.read_csv("https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/vaccinations/us_state_vaccinations.csv")
-    data = data[data["location"].isin(state["State"])]
-    state_name = pd.Index(state["State"])
-    data["state_id"] = data["location"].map(lambda x: state_name.get_loc(x) + 1)
-    today_data = data
-    #next line is used for daily update
-    #today_data = data[data["date"] == datetime.datetime.now().strftime('%Y-%m-%d')]
-    today_data = today_data.where(today_data.notnull(), None)
-    if len(today_data) > 1:
-        today_data = today_data[["state_id", "people_fully_vaccinated", "people_vaccinated_per_hundred", "date"]]
-        us_vac_list = today_data.values.tolist()
-        try:
-            conn = pymysql.connect(host=RDS_HOST, user=DB_USERNAME, passwd=PASSWORD, database=DB_NAME)
-        except:
-            print("ERROR: Unexpected error: Could not connect to MySQL instance.")
-            
-        with conn.cursor() as cur:
-            cur.executemany("INSERT INTO vaccine_us (us_state_id, number_people_vaccinated, percentage_people_vaccinated, date) values (%s, %s, %s, %s)", us_vac_list)
-            conn.commit()
-    print("Load us state vaccination finished!")
+# region[string]: "country"/"state"
+def load_vaccination(state, country, region):
+    region_id = "{0}_id".format(region)
+    table_name = "vaccine_{0}".format(region)
 
-def load_world_vaccination(country):
-    data = pd.read_csv("https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/vaccinations/vaccinations.csv")
-    data = data[data["location"].isin(country["Name"])]
-    country_name = pd.Index(country["Name"])
-    data["country_id"] = data["location"].map(lambda x: country_name.get_loc(x) + 1)
+    if region == "state":
+        data = pd.read_csv("https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/vaccinations/us_state_vaccinations.csv")
+        data = data[data["location"].isin(state["State"])]
+        region_index = pd.Index(state["State"])    
+    elif region == "country":
+        data = pd.read_csv("https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/vaccinations/vaccinations.csv")
+        data = data[data["location"].isin(country["Name"])]
+        region_index = pd.Index(country["Name"])
+    
+    data[region_id] = data["location"].map(lambda x: region_index.get_loc(x) + 1)
     today_data = data
     #next line is used for daily update
     #today_data = data[data["date"] == datetime.datetime.now().strftime('%Y-%m-%d')]
     today_data = today_data.where(today_data.notnull(), None)
+
     if len(today_data) > 1:
-        today_data = today_data[["country_id", "people_fully_vaccinated", "people_vaccinated_per_hundred", "date"]]
-        world_vac_list = today_data.values.tolist()
+        today_data = today_data[[region_id, "people_fully_vaccinated", "people_vaccinated_per_hundred", "date"]]
+        value_list = today_data.values.tolist()
         try:
             conn = pymysql.connect(host=RDS_HOST, user=DB_USERNAME, passwd=PASSWORD, database=DB_NAME)
         except:
             print("ERROR: Unexpected error: Could not connect to MySQL instance.")
             
         with conn.cursor() as cur:
-            cur.executemany("INSERT INTO vaccine_world (country_id, number_people_vaccinated, percentage_people_vaccinated, date) values (%s, %s, %s, %s)", world_vac_list)
+            cur.executemany("INSERT INTO {0} ({1}, number_people_vaccinated, percentage_people_vaccinated, date) values (%s, %s, %s, %s)".format(table_name, region_id), value_list)
             conn.commit()
     print("Load world vaccination finished!")
+
 
 # dataset[string]: "confirmed"/"deaths"
 # region[string]: "US"/"global"
@@ -296,10 +286,14 @@ if __name__ == "__main__":
     airport = transform_airport(country, state)
     load_airport(country, state)
     load_opensky_flight(airport)
-    load_us_state_vaccination(state)
-    load_world_vaccination(country)
+    # load_us_state_vaccination(state)
+    # load_global_vaccination(country)
     load_internation_flight_and_seat("seat", country)
     load_internation_flight_and_seat("flight", country)
+
+    load_vaccination(state, country, "country")
+    load_vaccination(state, country, "state")
+
     load_covid_death_and_comfirm(state, country, "deaths", "US")
     load_covid_death_and_comfirm(state, country, "deaths", "global")
     load_covid_death_and_comfirm(state, country, "confirmed", "US")
