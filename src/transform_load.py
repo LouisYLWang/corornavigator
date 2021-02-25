@@ -156,7 +156,7 @@ def load_vaccination(state, country, region):
 
 # dataset[string]: "confirmed"/"deaths"
 # region[string]: "US"/"global"
-def transform_covid_death_and_comfirm(state, country, dataset, region):
+def transform_covid_death_and_confirm(state, country, dataset, region):
     us_data_url = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_{0}_US.csv".format(dataset)
     global_data_url = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_{0}_global.csv".format(dataset)
     us_data = pd.read_csv(us_data_url)
@@ -188,8 +188,8 @@ def change_date_format(date_str):
     dt = datetime.datetime.strptime(date_str, '%m/%d/%y')
     return datetime.date.strftime(dt, "%Y-%m-%d")
 
-def load_covid_death_and_comfirm(state, country, dataset, region):
-    df = transform_covid_death_and_comfirm(state, country, dataset, region)
+def load_covid_death_and_confirm(state, country, dataset, region):
+    df = transform_covid_death_and_confirm(state, country, dataset, region)
     df = df.stack().reset_index()
     df.columns = ["country/state", 
                   "date",
@@ -294,7 +294,7 @@ if __name__ == "__main__":
     load_vaccination(state, country, "country")
     load_vaccination(state, country, "state")
 
-    load_covid_death_and_comfirm(state, country, "deaths", "US")
-    load_covid_death_and_comfirm(state, country, "deaths", "global")
-    load_covid_death_and_comfirm(state, country, "confirmed", "US")
-    load_covid_death_and_comfirm(state, country, "confirmed", "global")
+    load_covid_death_and_confirm(state, country, "deaths", "US")
+    load_covid_death_and_confirm(state, country, "deaths", "global")
+    load_covid_death_and_confirm(state, country, "confirmed", "US")
+    load_covid_death_and_confirm(state, country, "confirmed", "global")
