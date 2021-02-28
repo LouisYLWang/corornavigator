@@ -5,6 +5,7 @@ import rds_config
 import pymysql
 import json
 from pathlib import Path
+from extract import get_opensky_urls
 import os
 import numpy as np
 import datetime 
@@ -35,31 +36,66 @@ def transform_state():
 # transform airport 
 def transform_airport(country, state):
     airport = pd.read_csv(os.path.join(DATASET_DIR, "airport.csv"),  keep_default_na=False)    
-    airport["state"] = airport["iso_region"].apply(lambda x: x[3:] if x[:2] == "US" else pd.NA)
-    airport = airport[airport["iso_country"].isin(COUNTRIE_CODES)]
+    airport = airport[airport["iso_country"].isin(["US"])]
+    airport["state"] = airport["iso_region"].apply(lambda x: x[3:])
     airport = airport[~airport["type"].isin(["heliport", "closed"])]
-    airport = airport[["ident", "name", "coordinates", "state", "iso_country"]]
     airport = airport[~airport['state'].isin(['U-A'])]
-    county_index = pd.Index(country["Code"])
+    airport = airport[["ident", "name", "coordinates", "state", "iso_country"]]
     state_index = pd.Index(state["Code"])
-    airport["country_id"] = airport["iso_country"].map(lambda x: county_index.get_loc(x) + 1)
     airport["state_id"] = airport["state"].map(lambda x: state_index.get_loc(x) + 1 if x is not pd.NA else pd.NA)
     airport.reset_index(drop=True, inplace=True)
+    # flight["state_id"] = flight["airport_origin_id"].apply(lambda x: airport["state_id"][x])
+    # flight.groupby(["state_id", "date"])
+    # flight["month"] = flight["date"].apply()
     return airport
 
-def transform_flight(airport):
+def get_month(date_str):
+    dt = datetime.datetime.strptime(date_str, '%Y-%m-%d')
+    return datetime.date.strftime(dt, "%Y-%m")
+
+def transform_flight(airport, url):
     # extract data from zenodo, TODO: make extraction automated on lambda function
-    flight = pd.read_csv("https://zenodo.org/record/4485741/files/flightlist_20210101_20210131.csv.gz", compression='gzip', header=0, sep=',', error_bad_lines=False)
+    # latest url
+    # flight = pd.read_csv("https://zenodo.org/record/4485741/files/flightlist_20210101_20210131.csv.gz", compression='gzip', header=0, sep=',', error_bad_lines=False)
+    if url[-7:] != '.csv.gz':
+        return 
+    flight = pd.read_csv(url, compression='gzip', header=0, sep=',', error_bad_lines=False)
     flight['date'] = flight['day'].map(lambda x: x.split()[0])
     flight = flight[["origin", "destination", "date"]]
     flight = flight.dropna(subset=['origin', 'destination'])
     flight = flight[flight["origin"].isin(list(airport["ident"]))]
     flight = flight[flight["destination"].isin(list(airport["ident"]))]
     airport_index = pd.Index(airport["ident"])
-    flight["airport_origin_id"] = flight["origin"].map(lambda x: airport_index.get_loc(x) + 1)
-    flight["airport_destin_id"] = flight["destination"].map(lambda x: airport_index.get_loc(x) + 1)
+    flight["airport_origin_state"] = flight["origin"].map(lambda x: airport['state_id'][airport_index.get_loc(x)])
+    flight["airport_destin_state"] = flight["destination"].map(lambda x: airport['state_id'][airport_index.get_loc(x)])
     flight.reset_index(drop=True, inplace=True)
+    # flight["state_id"] = flight["airport_destin_id"].apply(lambda x: airport["state_id"][x])
     return flight
+
+def load_us_flight(airport):
+    for url in get_opensky_urls():
+            flight = transform_flight(airport, url)
+            try:
+                conn = pymysql.connect(host=RDS_HOST, user=DB_USERNAME, passwd=PASSWORD, database=DB_NAME)
+            except:
+                print("ERROR: Unexpected error: Could not connect to MySQL instance.")
+
+            for col in ["airport_destin_state", "airport_origin_state"]:
+                #month = get_month(flight['date'][0])
+                aggregate_flight = flight.groupby([col]).count()
+                aggregate_flight["month"] = flight['date'][0]
+                aggregate_flight["is_origin"] = col == 'airport_origin_state'
+                aggregate_flight["is_destination"] = col == 'airport_destin_state'
+                aggregate_flight.reset_index(level=0, inplace=True) 
+                aggregate_flight = aggregate_flight[[col, 'origin', 'is_origin', 'is_destination', 'month']]
+            
+                with conn.cursor() as cur:
+                    aggregate_flight = aggregate_flight.values.tolist()
+                    cur.executemany("INSERT INTO opensky_flight_state (state_id, flight_number, is_origin, is_destination, date) values (%s, %s, %s, %s, %s)", aggregate_flight)
+                    conn.commit()
+
+            print("Load {0} finished!".format(url))
+
 
 # load country 
 def load_country():
@@ -107,8 +143,8 @@ def load_airport(country, state):
         conn.commit()
     print("Load airport finished!") 
 
-def load_opensky_flight(airport):
-    flight = transform_flight(airport)
+def load_opensky_flight(airport, url):
+    flight = transform_flight(airport, url)
     try:
         conn = pymysql.connect(host=RDS_HOST, user=DB_USERNAME, passwd=PASSWORD, database=DB_NAME)
     except:
@@ -116,9 +152,9 @@ def load_opensky_flight(airport):
 
     with conn.cursor() as cur:
         flight_list = flight[["airport_origin_id", "airport_destin_id", "date"]].values.tolist()
-        cur.executemany("INSERT INTO opensky_flight_international (departure_airport_id, destination_airport_id, date) values (%s, %s, %s)", flight_list)
+        cur.executemany("INSERT INTO test_opensky_flight_international (departure_airport_id, destination_airport_id, date) values (%s, %s, %s)", flight_list)
         conn.commit()
-    print("Load interational flight finished!")
+    print("Load {0} finished!".format(url))
 
 # region[string]: "country"/"state"
 def load_vaccination(state, country, region):
@@ -170,11 +206,7 @@ def transform_covid_death_and_confirm(state, country, dataset, region):
         us_data = us_data.drop(columns=us_drop_columns).groupby(['Province_State']).sum()
         return us_data
     elif region == "global":
-        # add us to global
-        us_data = us_data.drop(columns=global_drop_columns).groupby(['iso2'], as_index=False).sum()    
-        us_data_ls = us_data[us_data["iso2"] == "US"].values.tolist()[0]
         global_data = global_data.drop(columns= ["Province/State", "Lat", "Long"])
-        global_data.loc[len(global_data)] = us_data_ls
         global_data = global_data.replace({
                 "US": "United States",
                 "Korea, South": "Korea, Republic of"})  
@@ -285,7 +317,9 @@ if __name__ == "__main__":
     state = transform_state()
     airport = transform_airport(country, state)
     load_airport(country, state)
-    load_opensky_flight(airport)
+    #load_opensky_flight(airport)
+    load_us_flight(airport)
+
     # load_us_state_vaccination(state)
     # load_global_vaccination(country)
     load_internation_flight_and_seat("seat", country)
