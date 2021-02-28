@@ -74,27 +74,29 @@ def transform_flight(airport, url):
 
 def load_us_flight(airport):
     for url in get_opensky_urls():
-            flight = transform_flight(airport, url)
-            try:
-                conn = pymysql.connect(host=RDS_HOST, user=DB_USERNAME, passwd=PASSWORD, database=DB_NAME)
-            except:
-                print("ERROR: Unexpected error: Could not connect to MySQL instance.")
+        if url[-7:] != '.csv.gz':
+            return 
+        flight = transform_flight(airport, url)
+        try:
+            conn = pymysql.connect(host=RDS_HOST, user=DB_USERNAME, passwd=PASSWORD, database=DB_NAME)
+        except:
+            print("ERROR: Unexpected error: Could not connect to MySQL instance.")
 
-            for col in ["airport_destin_state", "airport_origin_state"]:
-                #month = get_month(flight['date'][0])
-                aggregate_flight = flight.groupby([col]).count()
-                aggregate_flight["month"] = flight['date'][0]
-                aggregate_flight["is_origin"] = col == 'airport_origin_state'
-                aggregate_flight["is_destination"] = col == 'airport_destin_state'
-                aggregate_flight.reset_index(level=0, inplace=True) 
-                aggregate_flight = aggregate_flight[[col, 'origin', 'is_origin', 'is_destination', 'month']]
-            
-                with conn.cursor() as cur:
-                    aggregate_flight = aggregate_flight.values.tolist()
-                    cur.executemany("INSERT INTO opensky_flight_state (state_id, flight_number, is_origin, is_destination, date) values (%s, %s, %s, %s, %s)", aggregate_flight)
-                    conn.commit()
+        for col in ["airport_destin_state", "airport_origin_state"]:
+            #month = get_month(flight['date'][0])
+            aggregate_flight = flight.groupby([col]).count()
+            aggregate_flight["month"] = flight['date'][0]
+            aggregate_flight["is_origin"] = col == 'airport_origin_state'
+            aggregate_flight["is_destination"] = col == 'airport_destin_state'
+            aggregate_flight.reset_index(level=0, inplace=True) 
+            aggregate_flight = aggregate_flight[[col, 'origin', 'is_origin', 'is_destination', 'month']]
+        
+            with conn.cursor() as cur:
+                aggregate_flight = aggregate_flight.values.tolist()
+                cur.executemany("INSERT INTO opensky_flight_state (state_id, flight_number, is_origin, is_destination, date) values (%s, %s, %s, %s, %s)", aggregate_flight)
+                conn.commit()
 
-            print("Load {0} finished!".format(url))
+        print("Load {0} finished!".format(url))
 
 
 # load country 
