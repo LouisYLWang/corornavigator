@@ -1,13 +1,11 @@
 import pandas as pd
 import sys
-import logging
 import rds_config
 import pymysql
 import json
 from pathlib import Path
 from extract import get_opensky_urls
 import os
-import numpy as np
 import datetime 
 
 # const 
