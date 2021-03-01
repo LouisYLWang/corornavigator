@@ -118,6 +118,42 @@ def get_transformed_flight_and_seat(datasource):
     df = df[["country_id", col_name, "date"]]
     df['date']= df.to_datetime(df['date'], format='%Y-%m-%d', errors='ignore')
     return df
+
+def get_transformed_flight_and_seat(datasource, country, url):
+    if datasource == "seat":
+        title = SEAT_MONTH
+        sheet_name = "Output - Seats"
+    elif datasource == "flight":
+        title = FLIGHT_MONTH
+        sheet_name = "Output - Flights"
+    data = pd.read_excel(url, sheet_name=sheet_name)        
+    start = data[data.iloc[:, 0] == title].index[0] + 1
+    data = data.iloc[start: start + 17, :]
+    df = pd.DataFrame(data.iloc[2:, 1:13])
+    df.columns = list(data.iloc[0, :13][1:13])
+    df.index = list(data.iloc[:, 0])[2:]
+    df = df.stack().reset_index()
+    df.columns = ["country", "date", datasource + "_number"]
+    df = df.replace({"USA": "United States",
+                "South Korea": "Korea, Republic of" ,
+                "UAE": "United Arab Emirates"})  
+    col_name = datasource + "_number"
+    df = df[df["country"].isin(country["Name"])]
+    country_name = pd.Index(country["Name"])
+    df["country_id"] = df["country"].map(lambda x: country_name.get_loc(x) + 1)
+    df = df[["country_id", col_name, "date"]]
+    return df
+
+def get_weekday():
+    return datetime.datetime.today().weekday()
+
+def get_oag_url():
+    url = "https://www.oag.com/hubfs/Coronavirus%20Web%20Page%202020/"
+    url += 'coronavirus-tracking-charts-{0}/OAG-WEEKLY-TRACKER-{1}.xlsx'.format(
+        datetime.datetime.today().strftime('%d%m%y'),
+        datetime.datetime.today().strftime('%d-%b-%Y')
+    )
+    return url
  
 state = transform_state()
 country = transform_country()
@@ -129,3 +165,10 @@ schema_map = {
     "covid_case_state": get_transformed_covid_death_and_confirm(state, country, "confirmed", "US"),
     "covid_case_country": get_transformed_covid_death_and_confirm(state, country, "confirmed", "global")
 }
+
+# on each Monday update OAG data
+if get_weekday() == 0:
+    url = get_oag_url()
+    schema_map['oag_flight_international'] = get_transformed_flight_and_seat("flight", country, url)
+    schema_map['oag_seat_international'] = get_transformed_flight_and_seat("seat", country, url)
+    
