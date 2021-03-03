@@ -32,4 +32,4 @@
 
 [OpenSky - flights by airport](https://zenodo.org/record/4485741) (Highly biased data, may only be used for flight data of US)
 
-<iframe width="600" height="373.5" src="https://app.powerbi.com/view?r=eyJrIjoiMGYwY2RjODMtNmFiOS00Mzg2LWEwNGEtN2Y1ZjIwZDZmMWZmIiwidCI6ImY2YjZkZDViLWYwMmYtNDQxYS05OWEwLTE2MmFjNTA2MGJkMiIsImMiOjZ9&pageName=ReportSection" frameborder="0" allowFullScreen="true"></iframe>
+<iframe width="100%" height="1060" src="https://app.powerbi.com/view?r=eyJrIjoiMGYwY2RjODMtNmFiOS00Mzg2LWEwNGEtN2Y1ZjIwZDZmMWZmIiwidCI6ImY2YjZkZDViLWYwMmYtNDQxYS05OWEwLTE2MmFjNTA2MGJkMiIsImMiOjZ9&pageName=ReportSection" frameborder="0" allowFullScreen="true"></iframe>
