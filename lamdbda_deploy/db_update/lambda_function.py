@@ -70,11 +70,11 @@ def update_schema(schema):
     dataset['date'] = dataset['date'].astype(str)
     data_ls = dataset.values.tolist()
     if dataset.shape[0] == 0:
-        logger.error("INFO: No new data on schema {0}.".format(schema))
+        logger.info("SUCCESS: No new data on schema {0}.".format(schema))
     else:
         latest_date = max(dataset['date'])
         with conn.cursor() as cur:
            cur.executemany(query, data_ls)
            conn.commit()
-        logger.error("INFO: Update {0} queries on schema {1}, updated to {2}.".format(dataset.shape[0], schema, latest_date))
+        logger.info("SUCCESS: Update {0} queries on schema {1}, updated to {2}.".format(dataset.shape[0], schema, latest_date))
     return dataset.shape[0]
