@@ -26,15 +26,15 @@ def lambda_handler(event, context):
     """
     This function fetches content from MySQL RDS instance
     """
-    item_count = 0
-    update_info = ""
-    counter = 0
-    for schema in schema_map:
-        update_count = update_schema(schema)
-        if update_count != 0:
-            counter += 1
-        update_info += "schema {0} update {1} queries\n".format(schema, update_count)
-    
+    with conn:
+        update_info = ""
+        counter = 0
+        for schema in schema_map:
+            update_count = update_schema(schema)
+            if update_count != 0:
+                counter += 1
+            update_info += "schema {0} update {1} queries\n".format(schema, update_count)
+        
     return {
         'statusCode': 200,
         'body': json.dumps("Updated {0} schemas: \n{1}".format(counter, update_info))

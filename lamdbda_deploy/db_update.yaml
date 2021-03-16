@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: A starter AWS Lambda function.
+Resources:
+  dbupdate:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.7
+      CodeUri: .
+      Description: A starter AWS Lambda function.
+      MemorySize: 128
+      Timeout: 3
+      Role: 'arn:aws:iam::893860577563:role/service-role/db_update-role-f0631xua'
+      Events:
+        Schedule1:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 hour)
+        Api1:
+          Type: Api
+          Properties:
+            Path: /db_update
+            Method: ANY
+      Tags:
+        'lambda-console:blueprint': hello-world-python
+      Layers:
+        - 'arn:aws:lambda:us-west-1:113088814899:layer:Klayers-python37-pandas:22'
+        - 'arn:aws:lambda:us-west-1:113088814899:layer:Klayers-python37-PyMySQL:1'

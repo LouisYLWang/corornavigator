@@ -167,8 +167,8 @@ schema_map = {
 }
 
 # on each Monday update OAG data
-if get_weekday() == 0:
-    url = get_oag_url()
-    schema_map['oag_flight_international'] = get_transformed_flight_and_seat("flight", country, url)
-    schema_map['oag_seat_international'] = get_transformed_flight_and_seat("seat", country, url)
+# if get_weekday() == 0:
+#     url = get_oag_url()
+#     schema_map['oag_flight_international'] = get_transformed_flight_and_seat("flight", country, url)
+#     schema_map['oag_seat_international'] = get_transformed_flight_and_seat("seat", country, url)
     
