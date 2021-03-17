@@ -81,11 +81,6 @@ CREATE TABLE `flight_international` (
       REFERENCES airport(airport_id)
 );
 
-#SELECT COUNT(flight_id) FROM flight_international JOIN airport a ON flight_international.departure_airport_id = a.airport_id JOIN country c on a.country_id = c.country_id WHERE c.country_code = 'US'
-#SELECT country_code, COUNT(airport_code) FROM airport JOIN country c on airport.country_id = c.country_id GROUP BY country_code
-#SELECT country_name, COUNT(flight_id) FROM flight_international JOIN airport a ON flight_international.departure_airport_id = a.airport_id JOIN country c on a.country_id = c.country_id GROUP BY country_name
-#SELECT us_state_code, COUNT(flight_id) FROM flight_international JOIN airport a ON flight_international.departure_airport_id = a.airport_id JOIN us_state us on a.state_id = us.us_state_id GROUP BY us_state_code
-
 CREATE TABLE `flights_us` (
   `flight_id` INT AUTO_INCREMENT,
   `departure_airport_id` INT,
